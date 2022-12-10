@@ -1,0 +1,130 @@
+---
+title: "Assignment 1"
+author: "Britney Nguyet Dang"
+date: '2022-05-24'
+output:
+  html_document:
+    theme: lumen
+    highlight: pygments
+    center: true
+    number_sections: yes
+    toc: yes
+    fig_width: 20
+    fig_height: 20
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Set up, Data Import And Inspection Code
+```{r Set up, Data Import And Inspection Code}
+## 1A - Working direction and data import
+### Import a csv file
+library(tictoc)
+tic()
+
+mydir <- getwd()
+setwd(mydir)
+
+CD_data <- read.csv(file="CD_additional_balanced.csv",stringsAsFactors = FALSE)
+
+### Examine the overall structure of input data
+str(CD_data)
+summary(CD_data)
+
+## 2A - Data Transformation
+### Transform from character variables to factor variables
+CD_data$job <- factor(CD_data$job)
+CD_data$marital <- factor(CD_data$marital)
+CD_data$education <- factor(CD_data$education)
+CD_data$default <- factor(CD_data$default)
+CD_data$housing <- factor(CD_data$housing)
+CD_data$loan <- factor(CD_data$loan)
+CD_data$contact <- factor(CD_data$contact)
+CD_data$month <- factor(CD_data$month)
+CD_data$day_of_week <- factor(CD_data$day_of_week)
+CD_data$poutcome <- factor(CD_data$poutcome)
+CD_data$y <- factor(CD_data$y)
+
+### Examine the overall structure of transformed data
+str(CD_data)
+summary(CD_data)
+```
+
+# Create charts for numeric variables
+```{r Create charts for numeric variables}
+## 2A - Histogram
+hist(CD_data$age, main = "Histogram of Age in the CD data set", xlab = "Age")
+hist(CD_data$duration, main = "Histogram of Duration in the CD data set", xlab = "Duration")
+hist(CD_data$campaign, main = "Histogram of Campaign in the CD data set", xlab = "Campaign")
+hist(CD_data$pdays, main = "Histogram of Pdays in the CD data set", xlab = "Pdays")
+
+## 2B - Boxplot
+boxplot(CD_data$age, main = "Boxplot of Age in the CD data set", ylab = "Age")
+boxplot(CD_data$duration, main = "Boxplot of Duration in the CD data set", ylab = "Duration")
+boxplot(CD_data$campaign, main = "Boxplot of Campaign in the CD data set", ylab = "Campaign")
+boxplot(CD_data$pdays, main = "Boxplot of Pdays in the CD data set", ylab = "Pdays")
+
+## 2C - Deciles of the variable
+quantile(CD_data$age, seq(from = 0, to = 1, by = 0.10))
+quantile(CD_data$duration, seq(from = 0, to = 1, by = 0.10))
+quantile(CD_data$campaign, seq(from = 0, to = 1, by = 0.10))
+quantile(CD_data$pdays, seq(from = 0, to = 1, by = 0.10))
+```
+
+# Explore Factor Variables
+```{r Explore Factor Variables}
+## 3A - Count value and percentage value of instances belonging to its level
+### Compute table proportions 
+job.proptable <- prop.table(table(CD_data$job))
+marital.proptable <- prop.table(table(CD_data$marital))
+loan.proptable <- prop.table(table(CD_data$loan))
+y.proptable <- prop.table(table(CD_data$y))
+
+### Round percentage into 4 decimals
+round(job.proptable, digits = 4)
+round(marital.proptable, digits = 4)
+round(loan.proptable, digits = 4)
+round(y.proptable, digits = 4)
+
+## 3B - Barplot with a level name for each possible value and a descriptive title
+barplot(job.proptable, main = "Plot of Job in the CD data set", xlab = "Job")
+barplot(marital.proptable, main = "Plot of Marital in the CD data set", xlab = "Marital")
+barplot(loan.proptable, main = "Plot of Loan in the CD data set", xlab = "Loan")
+barplot(y.proptable, main = "Plot of y in the CD data set", xlab = "y")
+```
+
+# Explore Relationships Amongst Multiple Variables
+```{r Explore Relationships Amongst Multiple Variables}
+## 4A - Display correlations for numeric variables
+library(psych)
+cor(CD_data[c("age","duration","campaign","pdays","euribor3m","emp.var.rate","nr.employed")])
+pairs.panels(CD_data)
+
+## 4B - Perform on these numeric variables: duration, emp.var.rate, cons.price.idx, and cons.conf.idx
+### (i) Boxplot
+boxplot(duration~y, data = CD_data)
+boxplot(emp.var.rate~y, data = CD_data)
+boxplot(cons.price.idx~y, data = CD_data)
+boxplot(cons.conf.idx~y, data = CD_data)
+
+### (ii) Aggregate function with 'Summary'
+aggregate(duration~y, summary, data = CD_data)
+aggregate(emp.var.rate~y, summary, data = CD_data)
+aggregate(cons.price.idx~y, summary, data = CD_data)
+aggregate(cons.conf.idx~y, summary, data = CD_data)
+
+## 4C - Draw 3D Scatter plot
+library(scatterplot3d)
+
+### (i) age, campaign, and duration
+scatterplot3d(CD_data$age,CD_data$campaign,CD_data$duration, pch = as.numeric(CD_data$y), main = "3D scatter plot of CD data")
+legend('topright',legend = levels(CD_data$y), cex = 0.8, pch = 1:2)
+
+### (ii) nr.employed, euribor3m, and duration
+scatterplot3d(CD_data$nr.employed,CD_data$euribor3m,CD_data$duration, pch = as.numeric(CD_data$y), main = "3D scatter plot of CD data")
+legend('topright',legend = levels(CD_data$y), cex = 0.8, pch = 1:2)
+```
