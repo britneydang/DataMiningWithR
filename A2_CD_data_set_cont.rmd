@@ -1,0 +1,216 @@
+---
+title: "Assignment 2 - CD Rmarkdown"
+author: "Britney Nguyet Dang"
+date: '2022-05-31'
+output: 
+  html_document:
+    theme: readable
+    highlight: breezedark
+    number_sections: yes
+    toc: yes
+    toc_depth: 1
+    fig_width: 25
+    fig_height: 15
+  editor_options:
+    chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Set up, data import and inspection code
+```{r Set up, data import and inpsection code}
+# 1A
+## Install packages
+library(tictoc)
+library(caret)
+library(ggplot2)
+library(lattice)
+library(C50)
+library(rminer)
+tic()
+
+## Set working directory
+mydir <- getwd()
+setwd(mydir)
+
+## Import csv file
+CD_data <- read.csv(file="CD_additional_balanced.csv",stringsAsFactors = FALSE)
+
+## Examine overall structure of input data
+str(CD_data)
+
+# 1B
+## Transform from character variables to factor variables
+CD_data$job <- factor(CD_data$job)
+CD_data$marital <- factor(CD_data$marital)
+CD_data$education <- factor(CD_data$education)
+CD_data$default <- factor(CD_data$default)
+CD_data$housing <- factor(CD_data$housing)
+CD_data$loan <- factor(CD_data$loan)
+CD_data$contact <- factor(CD_data$contact)
+CD_data$month <- factor(CD_data$month)
+CD_data$day_of_week <- factor(CD_data$day_of_week)
+CD_data$poutcome <- factor(CD_data$poutcome)
+CD_data$y <- factor(CD_data$y)
+
+## Overall structure
+str(CD_data)
+
+## Summary of input data
+summary(CD_data)
+```
+
+# Target variable
+```{r Target variable}
+# Count value and percentage value of instances belonging to its level
+y.proptable <- prop.table(table(CD_data$y))
+round(y.proptable, digits = 4)
+```
+
+# Data preparation
+```{r Data preparation}
+# 3A Partition the data set
+## Partition
+set.seed(100)
+training70 <- createDataPartition(CD_data$y,p=0.7,list=FALSE)
+str(training70)
+training70
+
+## Create training and testing sets
+CD_trainingset <- CD_data[training70,]
+CD_testingset <- CD_data[-training70,]
+
+## Summary training and testing sets
+summary(CD_trainingset)
+summary(CD_testingset)
+
+# 3B Show distributions of y
+table(CD_trainingset$y)
+table(CD_testingset$y)
+
+prop.table(table(CD_trainingset$y))
+prop.table(table(CD_testingset$y))
+```
+
+# Train and test decision tree 1 to classify y
+```{r Train and test decision tree 1 to classify y}
+# 4A Train C5.0 model - Decision Tree 1
+## Use training set to build model
+CD.c50 <- C5.0(CD_trainingset$y~.,CD_trainingset)
+CD.c50
+plot(CD.c50)
+## Summary
+summary(CD.c50)
+
+# 4B Generate and compare this model's confusion matrices and classification evaluation  metrics
+## Testing set
+predicted.y <- predict(CD.c50,CD_testingset)
+predicted.y
+
+mmetric(CD_testingset$y,predicted.y,metric="CONF")
+mmetric(CD_testingset$y,predicted.y,metric=c("ACC","TPR","PRECISION","F1"))
+
+## Training set
+predicted.y.1 <- predict(CD.c50,CD_trainingset)
+predicted.y.1
+
+mmetric(CD_trainingset$y,predicted.y.1,metric="CONF")
+mmetric(CD_trainingset$y,predicted.y.1,metric=c("ACC","TPR","PRECISION","F1"))
+```
+
+# Train and test decision tree 2 to classify y
+```{r Train and test decision tree 2 to classify y}
+# 5A Build a simplified version of decision tree 1 - Decision Tree 2
+## Adjust CF
+CD.2.c50.1 <- C5.0(CD_trainingset[-21],CD_trainingset$y,control=C5.0Control(CF=1))
+CD.2.c50.1
+CD.2.c50.2 <- C5.0(CD_trainingset[-21],CD_trainingset$y,control=C5.0Control(CF=0.5))
+CD.2.c50.2
+CD.2.c50.3 <- C5.0(CD_trainingset[-21],CD_trainingset$y,control=C5.0Control(CF=0.3))
+CD.2.c50.3
+CD.2.c50.4 <- C5.0(CD_trainingset[-21],CD_trainingset$y,control=C5.0Control(CF=0.01))
+CD.2.c50.4
+
+## Summary
+summary(CD.2.c50.4)
+
+## Plot tree
+plot(CD.2.c50.4)
+
+# 5B Generate and compare this model's confusion matrices and classification evaluation  metrics
+## Testing set
+predicted.y.2 <- predict(CD.2.c50.4,CD_testingset)
+predicted.y.2
+
+mmetric(CD_testingset$y,predicted.y.2,metric="CONF")
+mmetric(CD_testingset$y,predicted.y.2,metric=c("ACC","TPR","PRECISION","F1"))
+
+## Training set
+predicted.y.3 <- predict(CD.2.c50.4,CD_trainingset)
+predicted.y.3
+
+mmetric(CD_trainingset$y,predicted.y.3,metric="CONF")
+mmetric(CD_trainingset$y,predicted.y.3,metric=c("ACC","TPR","PRECISION","F1"))
+```
+
+# Train and Test Decision Tree 3 to predict y
+```{r Train and Test Decision Tree 3 to predict y}
+# 6A Remove "Duration" - Decision Tree 3
+## Remove "Duration" position 11
+CD.3.c50 <- C5.0(CD_trainingset[c(-11,-21)],CD_trainingset$y)
+CD.3.c50
+
+## Summary
+summary(CD.3.c50)
+
+# 6B Generate and compare this model's confusion matrices and classification evaluation  metrics
+predicted.y.4 <- predict(CD.3.c50,CD_testingset)
+predicted.y.4
+
+mmetric(CD_testingset$y,predicted.y.4,metric="CONF")
+mmetric(CD_testingset$y,predicted.y.4,metric=c("ACC","TPR","PRECISION","F1"))
+
+## Training set
+predicted.y.5 <- predict(CD.3.c50,CD_trainingset)
+predicted.y.5
+
+mmetric(CD_trainingset$y,predicted.y.5,metric="CONF")
+mmetric(CD_trainingset$y,predicted.y.5,metric=c("ACC","TPR","PRECISION","F1"))
+```
+
+# Train and Test Decision Tree 4 to classify y
+```{r Train and Test Decision Tree 4 to classify y}
+# 7A Build a simplified version of decision tree 3 - Decision Tree 4
+## Adjust CF 
+CD.4.c50.1 <- C5.0(CD_trainingset[c(-11,-21)],CD_trainingset$y,control=C5.0Control(CF=1))
+CD.4.c50.1
+CD.4.c50.2 <- C5.0(CD_trainingset[c(-11,-21)],CD_trainingset$y,control=C5.0Control(CF=0.5))
+CD.4.c50.2
+CD.4.c50.3 <- C5.0(CD_trainingset[c(-11,-21)],CD_trainingset$y,control=C5.0Control(CF=0.3))
+CD.4.c50.3
+CD.4.c50.4 <- C5.0(CD_trainingset[c(-11,-21)],CD_trainingset$y,control=C5.0Control(CF=0.01)) 
+CD.4.c50.4
+
+## Summary
+summary(CD.4.c50.4)
+
+## Plot tree
+plot(CD.4.c50.4)
+
+# 7B Generate and compare this model's confusion matrices and classification evaluation  metrics
+## Testing set
+predicted.y.6 <- predict(CD.4.c50.4,CD_testingset)
+predicted.y.6
+
+mmetric(CD_testingset$y,predicted.y.6,metric="CONF")
+mmetric(CD_testingset$y,predicted.y.6,metric=c("ACC","TPR","PRECISION","F1"))
+
+## Training set
+predicted.y.7 <- predict(CD.4.c50.4,CD_trainingset)
+predicted.y.7
+
+mmetric(CD_trainingset$y,predicted.y.7,metric="CONF")
+mmetric(CD_trainingset$y,predicted.y.7,metric=c("ACC","TPR","PRECISION","F1"))
+```

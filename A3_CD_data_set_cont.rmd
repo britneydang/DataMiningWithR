@@ -1,0 +1,494 @@
+---
+title: "Assignment 3 - Modified CD data set"
+author: "Britney Nguyet Dang"
+date: '2022-06-06'
+output: 
+  html_document:
+    theme: readable
+    highlight: breezedark
+    number_sections: yes
+    toc: yes
+    fig_width: 10
+    fig_height: 5
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Set up, Data import, and Preparation
+```{r Set up, Data import, and Preparation}
+# 1A 
+## Package loading 
+library(e1071)
+library(psych)
+library(caret)
+library(rminer)
+library(rmarkdown)
+library(tictoc) 
+library(C50)
+library(ggplot2)
+library(lattice)
+library(matrixStats)
+library(knitr)
+tic()
+
+## Set directory
+mydir <- getwd()
+setwd(mydir)
+
+## Data import
+CD_mdata <- read.csv(file="CD_additional_modified.csv",stringsAsFactors = FALSE)
+
+## Overall structure and Summary of input data
+str(CD_mdata)
+summary(CD_mdata)
+
+## Transform from character variables to factor variables
+CD_mdata$job <- factor(CD_mdata$job)
+CD_mdata$marital <- factor(CD_mdata$marital)
+CD_mdata$education <- factor(CD_mdata$education)
+CD_mdata$default <- factor(CD_mdata$default)
+CD_mdata$housing <- factor(CD_mdata$housing)
+CD_mdata$loan <- factor(CD_mdata$loan)
+CD_mdata$contact <- factor(CD_mdata$contact)
+CD_mdata$month <- factor(CD_mdata$month)
+CD_mdata$day_of_week <- factor(CD_mdata$day_of_week)
+CD_mdata$poutcome <- factor(CD_mdata$poutcome)
+CD_mdata$y <- factor(CD_mdata$y)
+
+# 1B Partition data frame
+set.seed(100)
+training70 <- createDataPartition(CD_mdata$y,p=0.7,list=FALSE)
+str(training70)
+training70
+
+# 1C Show distributions (in %) of target variable in input data frame, train set, and test set
+## Create training and testing sets
+trainingset <- CD_mdata[training70,]
+testingset <- CD_mdata[-training70,]
+
+## Summary training and testing sets
+summary(trainingset)
+summary(testingset)
+
+## Show distribution of y
+### In the whole data frame
+table(CD_mdata$y)
+prop.table(table(CD_mdata$y))
+
+### In training set
+table(trainingset$y)
+prop.table(table(trainingset$y))
+
+### In testing set
+table(testingset$y)
+prop.table(table(testingset$y))
+```
+
+
+# Simple Decision Tree Training and Testing
+```{r Simple Decision Tree Training and Testing}
+# 2A Train a C5.0 model w/ default setting
+## Build model - decision tree 1
+mCD.c50 <- C5.0(trainingset$y~.,trainingset)
+mCD.c50
+summary(mCD.c50)
+
+## Generate and compare this model's confusion matrices and classification evaluation metrics
+### In training set
+predicted_train1 <- predict(mCD.c50,trainingset)
+predicted_train1
+mmetric(trainingset$y,predicted_train1,metric="CONF")
+mmetric(trainingset$y,predicted_train1,metric=c("ACC","TPR","PRECISION","F1"))
+
+### In testing set
+predicted_test1 <- predict(mCD.c50,testingset)
+predicted_test1
+mmetric(testingset$y,predicted_test1,metric="CONF")
+mmetric(testingset$y,predicted_test1,metric=c("ACC","TPR","PRECISION","F1"))
+
+# 2B Reduce tree complexity by lowering CF level
+## Build model - decision tree 2
+mCD.c50.2 <- C5.0(trainingset[-21],trainingset$y,control=C5.0Control(CF=0.1))
+plot(mCD.c50.2)
+
+## Generate and compare this model's confusion matrices and classification evaluation metrics
+### In training set
+predicted_train2 <- predict(mCD.c50.2,trainingset)
+predicted_train2
+mmetric(trainingset$y,predicted_train2,metric="CONF")
+mmetric(trainingset$y,predicted_train2,metric=c("ACC","TPR","PRECISION","F1"))
+
+### In testing set
+predicted_test2 <- predict(mCD.c50.2,testingset)
+predicted_test2
+mmetric(testingset$y,predicted_test2,metric="CONF")
+mmetric(testingset$y,predicted_test2,metric=c("ACC","TPR","PRECISION","F1"))
+```
+
+# Simple Naive Bayes Model Training and Testing
+```{r Simple Naive Bayes Model Training and Testing}
+# 3A Train a Naive Bayes model using training set from #1
+## Build model - naive bayes 1
+mCD.nb <- naiveBayes(trainingset$y~.,trainingset)
+mCD.nb
+
+## Generate and compare this model's confusion matrices and classification evaluation metrics
+### In training set
+predicted_train_nb <- predict(mCD.nb,trainingset)
+predicted_train_nb
+mmetric(trainingset$y,predicted_train_nb,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb,metric=c("ACC","TPR","PRECISION","F1"))
+
+### In testing set
+predicted_test_nb <- predict(mCD.nb,testingset)
+predicted_test_nb
+mmetric(testingset$y,predicted_test_nb,metric="CONF")
+mmetric(testingset$y,predicted_test_nb,metric=c("ACC","TPR","PRECISION","F1"))
+
+# 3B Remove a predictor to improve the true positive rate of "yes" class of target variable y
+## Build model - Naive Bayes 2 - testing many versions by removing one predictor at a time
+
+### Remove "age" - position 1. True Positive class "Yes" Training = 192, Testing = 71
+mCD.nb.1 <- naiveBayes(trainingset[c(-1,-21)],trainingset$y)
+mCD.nb.1
+predicted_train_nb.1 <- predict(mCD.nb.1,trainingset)
+predicted_train_nb.1
+mmetric(trainingset$y,predicted_train_nb.1,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb.1,metric=c("ACC","TPR","PRECISION","F1"))
+predicted_test_nb.1 <- predict(mCD.nb.1,testingset)
+predicted_test_nb.1
+mmetric(testingset$y,predicted_test_nb.1,metric="CONF")
+mmetric(testingset$y,predicted_test_nb.1,metric=c("ACC","TPR","PRECISION","F1"))
+
+### Remove "job" - position 2. True Positive class "Yes" Training = 191, Testing = 91
+mCD.nb.2 <- naiveBayes(trainingset[c(-2,-21)],trainingset$y)
+mCD.nb.2
+predicted_train_nb.2 <- predict(mCD.nb.2,trainingset)
+predicted_train_nb.2
+mmetric(trainingset$y,predicted_train_nb.2,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb.2,metric=c("ACC","TPR","PRECISION","F1"))
+predicted_test_nb.2 <- predict(mCD.nb.2,testingset)
+predicted_test_nb.2
+mmetric(testingset$y,predicted_test_nb.2,metric="CONF")
+mmetric(testingset$y,predicted_test_nb.2,metric=c("ACC","TPR","PRECISION","F1"))
+
+### Remove "marital" - position 3. True Positive class "Yes" Training = 192, Testing = 75
+mCD.nb.3 <- naiveBayes(trainingset[c(-3,-21)],trainingset$y)
+mCD.nb.3
+predicted_train_nb.3 <- predict(mCD.nb.3,trainingset)
+predicted_train_nb.3
+mmetric(trainingset$y,predicted_train_nb.3,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb.3,metric=c("ACC","TPR","PRECISION","F1"))
+predicted_test_nb.3 <- predict(mCD.nb.3,testingset)
+predicted_test_nb.3
+mmetric(testingset$y,predicted_test_nb.3,metric="CONF")
+mmetric(testingset$y,predicted_test_nb.3,metric=c("ACC","TPR","PRECISION","F1"))
+
+### Remove "education" - position 4. True Positive class "Yes" Training = 193, Testing = 75
+mCD.nb.4 <- naiveBayes(trainingset[c(-4,-21)],trainingset$y)
+mCD.nb.4
+predicted_train_nb.4 <- predict(mCD.nb.4,trainingset)
+predicted_train_nb.4
+mmetric(trainingset$y,predicted_train_nb.4,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb.4,metric=c("ACC","TPR","PRECISION","F1"))
+predicted_test_nb.4 <- predict(mCD.nb.4,testingset)
+predicted_test_nb.4
+mmetric(testingset$y,predicted_test_nb.4,metric="CONF")
+mmetric(testingset$y,predicted_test_nb.4,metric=c("ACC","TPR","PRECISION","F1"))
+
+### Remove "default" - position 5. True Positive class "Yes" Training = 194, Testing = 75
+mCD.nb.5 <- naiveBayes(trainingset[c(-5,-21)],trainingset$y)
+mCD.nb.5
+predicted_train_nb.5 <- predict(mCD.nb.5,trainingset)
+predicted_train_nb.5
+mmetric(trainingset$y,predicted_train_nb.5,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb.5,metric=c("ACC","TPR","PRECISION","F1"))
+predicted_test_nb.5 <- predict(mCD.nb.5,testingset)
+predicted_test_nb.5
+mmetric(testingset$y,predicted_test_nb.5,metric="CONF")
+mmetric(testingset$y,predicted_test_nb.5,metric=c("ACC","TPR","PRECISION","F1"))
+
+### Remove "housing" - position 6. True Positive class "Yes" Training = 194, Testing = 75
+mCD.nb.6 <- naiveBayes(trainingset[c(-6,-21)],trainingset$y)
+mCD.nb.6
+predicted_train_nb.6 <- predict(mCD.nb.6,trainingset)
+predicted_train_nb.6
+mmetric(trainingset$y,predicted_train_nb.6,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb.6,metric=c("ACC","TPR","PRECISION","F1"))
+predicted_test_nb.6 <- predict(mCD.nb.6,testingset)
+predicted_test_nb.6
+mmetric(testingset$y,predicted_test_nb.6,metric="CONF")
+mmetric(testingset$y,predicted_test_nb.6,metric=c("ACC","TPR","PRECISION","F1"))
+
+### Remove "loan" - position 7. True Positive class "Yes" Training = 194, Testing = 75
+mCD.nb.7 <- naiveBayes(trainingset[c(-7,-21)],trainingset$y)
+mCD.nb.7
+predicted_train_nb.7 <- predict(mCD.nb.7,trainingset)
+predicted_train_nb.7
+mmetric(trainingset$y,predicted_train_nb.7,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb.7,metric=c("ACC","TPR","PRECISION","F1"))
+predicted_test_nb.7 <- predict(mCD.nb.7,testingset)
+predicted_test_nb.7
+mmetric(testingset$y,predicted_test_nb.7,metric="CONF")
+mmetric(testingset$y,predicted_test_nb.7,metric=c("ACC","TPR","PRECISION","F1"))
+
+### Remove "contact" - position 8. True Positive class "Yes" Training = 189, Testing = 75
+mCD.nb.8 <- naiveBayes(trainingset[c(-8,-21)],trainingset$y)
+mCD.nb.8
+predicted_train_nb.8 <- predict(mCD.nb.8,trainingset)
+predicted_train_nb.8
+mmetric(trainingset$y,predicted_train_nb.8,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb.8,metric=c("ACC","TPR","PRECISION","F1"))
+predicted_test_nb.8 <- predict(mCD.nb.8,testingset)
+predicted_test_nb.8
+mmetric(testingset$y,predicted_test_nb.8,metric="CONF")
+mmetric(testingset$y,predicted_test_nb.8,metric=c("ACC","TPR","PRECISION","F1"))
+
+### Remove "month" - position 9. True Positive class "Yes" Training = 186, Testing = 75
+mCD.nb.9 <- naiveBayes(trainingset[c(-9,-21)],trainingset$y)
+mCD.nb.9
+predicted_train_nb.9 <- predict(mCD.nb.9,trainingset)
+predicted_train_nb.9
+mmetric(trainingset$y,predicted_train_nb.9,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb.9,metric=c("ACC","TPR","PRECISION","F1"))
+predicted_test_nb.9 <- predict(mCD.nb.9,testingset)
+predicted_test_nb.9
+mmetric(testingset$y,predicted_test_nb.9,metric="CONF")
+mmetric(testingset$y,predicted_test_nb.9,metric=c("ACC","TPR","PRECISION","F1"))
+
+### Remove "day_of_week" - position 10. True Positive class "Yes" Training = 193, Testing = 75
+mCD.nb.10 <- naiveBayes(trainingset[c(-10,-21)],trainingset$y)
+mCD.nb.10
+predicted_train_nb.10 <- predict(mCD.nb.10,trainingset)
+predicted_train_nb.10
+mmetric(trainingset$y,predicted_train_nb.10,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb.10,metric=c("ACC","TPR","PRECISION","F1"))
+predicted_test_nb.10 <- predict(mCD.nb.10,testingset)
+predicted_test_nb.10
+mmetric(testingset$y,predicted_test_nb.10,metric="CONF")
+mmetric(testingset$y,predicted_test_nb.10,metric=c("ACC","TPR","PRECISION","F1"))
+
+### Remove "duration" - position 11. True Positive class "Yes" Training = 165, Testing = 59
+mCD.nb.11 <- naiveBayes(trainingset[c(-11,-21)],trainingset$y)
+mCD.nb.11
+predicted_train_nb.11 <- predict(mCD.nb.11,trainingset)
+predicted_train_nb.11
+mmetric(trainingset$y,predicted_train_nb.11,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb.11,metric=c("ACC","TPR","PRECISION","F1"))
+predicted_test_nb.11 <- predict(mCD.nb.11,testingset)
+predicted_test_nb.11
+mmetric(testingset$y,predicted_test_nb.11,metric="CONF")
+mmetric(testingset$y,predicted_test_nb.11,metric=c("ACC","TPR","PRECISION","F1"))
+
+### Remove "campaign" - position 12. True Positive class "Yes" Training = 185, Testing = 71
+mCD.nb.12 <- naiveBayes(trainingset[c(-12,-21)],trainingset$y)
+mCD.nb.12
+predicted_train_nb.12 <- predict(mCD.nb.12,trainingset)
+predicted_train_nb.12
+mmetric(trainingset$y,predicted_train_nb.12,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb.12,metric=c("ACC","TPR","PRECISION","F1"))
+predicted_test_nb.12 <- predict(mCD.nb.12,testingset)
+predicted_test_nb.12
+mmetric(testingset$y,predicted_test_nb.12,metric="CONF")
+mmetric(testingset$y,predicted_test_nb.12,metric=c("ACC","TPR","PRECISION","F1"))
+
+### Remove "pdays" - position 13. True Positive class "Yes" Training = 219, Testing = 87
+mCD.nb.13 <- naiveBayes(trainingset[c(-13,-21)],trainingset$y)
+mCD.nb.13
+predicted_train_nb.13 <- predict(mCD.nb.13,trainingset)
+predicted_train_nb.13
+mmetric(trainingset$y,predicted_train_nb.13,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb.13,metric=c("ACC","TPR","PRECISION","F1"))
+predicted_test_nb.13 <- predict(mCD.nb.13,testingset)
+predicted_test_nb.13
+mmetric(testingset$y,predicted_test_nb.13,metric="CONF")
+mmetric(testingset$y,predicted_test_nb.13,metric=c("ACC","TPR","PRECISION","F1"))
+
+### Remove "previous" - position 14. True Positive class "Yes" Training = 206, Testing = 81
+mCD.nb.14 <- naiveBayes(trainingset[c(-14,-21)],trainingset$y)
+mCD.nb.14
+predicted_train_nb.14 <- predict(mCD.nb.14,trainingset)
+predicted_train_nb.14
+mmetric(trainingset$y,predicted_train_nb.14,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb.14,metric=c("ACC","TPR","PRECISION","F1"))
+predicted_test_nb.14 <- predict(mCD.nb.14,testingset)
+predicted_test_nb.14
+mmetric(testingset$y,predicted_test_nb.14,metric="CONF")
+mmetric(testingset$y,predicted_test_nb.14,metric=c("ACC","TPR","PRECISION","F1"))
+
+### Remove "poutcome" - position 15. True Positive class "Yes" Training = 198, Testing = 76
+mCD.nb.15 <- naiveBayes(trainingset[c(-15,-21)],trainingset$y)
+mCD.nb.15
+predicted_train_nb.15 <- predict(mCD.nb.15,trainingset)
+predicted_train_nb.15
+mmetric(trainingset$y,predicted_train_nb.15,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb.15,metric=c("ACC","TPR","PRECISION","F1"))
+predicted_test_nb.15 <- predict(mCD.nb.15,testingset)
+predicted_test_nb.15
+mmetric(testingset$y,predicted_test_nb.15,metric="CONF")
+mmetric(testingset$y,predicted_test_nb.15,metric=c("ACC","TPR","PRECISION","F1"))
+
+### Remove "emp.var.rate" - position 16. True Positive class "Yes" Training = 174, Testing = 71
+mCD.nb.16 <- naiveBayes(trainingset[c(-16,-21)],trainingset$y)
+mCD.nb.16
+predicted_train_nb.16 <- predict(mCD.nb.16,trainingset)
+predicted_train_nb.16
+mmetric(trainingset$y,predicted_train_nb.16,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb.16,metric=c("ACC","TPR","PRECISION","F1"))
+predicted_test_nb.16 <- predict(mCD.nb.16,testingset)
+predicted_test_nb.16
+mmetric(testingset$y,predicted_test_nb.16,metric="CONF")
+mmetric(testingset$y,predicted_test_nb.16,metric=c("ACC","TPR","PRECISION","F1"))
+
+### Remove "cons.price.idx" - position 17. True Positive class "Yes" Training = 188, Testing = 72
+mCD.nb.17 <- naiveBayes(trainingset[c(-17,-21)],trainingset$y)
+mCD.nb.17
+predicted_train_nb.17 <- predict(mCD.nb.17,trainingset)
+predicted_train_nb.17
+mmetric(trainingset$y,predicted_train_nb.17,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb.17,metric=c("ACC","TPR","PRECISION","F1"))
+predicted_test_nb.17 <- predict(mCD.nb.17,testingset)
+predicted_test_nb.17
+mmetric(testingset$y,predicted_test_nb.17,metric="CONF")
+mmetric(testingset$y,predicted_test_nb.17,metric=c("ACC","TPR","PRECISION","F1"))
+
+### Remove "cons.conf.idx" - position 18. True Positive class "Yes" Training = 194, Testing = 72
+mCD.nb.18 <- naiveBayes(trainingset[c(-18,-21)],trainingset$y)
+mCD.nb.18
+predicted_train_nb.18 <- predict(mCD.nb.18,trainingset)
+predicted_train_nb.18
+mmetric(trainingset$y,predicted_train_nb.18,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb.18,metric=c("ACC","TPR","PRECISION","F1"))
+predicted_test_nb.18 <- predict(mCD.nb.18,testingset)
+predicted_test_nb.18
+mmetric(testingset$y,predicted_test_nb.18,metric="CONF")
+mmetric(testingset$y,predicted_test_nb.18,metric=c("ACC","TPR","PRECISION","F1"))
+
+### Remove "euribor3m" - position 19. True Positive class "Yes" Training = 180, Testing = 69
+mCD.nb.19 <- naiveBayes(trainingset[c(-19,-21)],trainingset$y)
+mCD.nb.19
+predicted_train_nb.19 <- predict(mCD.nb.19,trainingset)
+predicted_train_nb.19
+mmetric(trainingset$y,predicted_train_nb.19,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb.19,metric=c("ACC","TPR","PRECISION","F1"))
+predicted_test_nb.19 <- predict(mCD.nb.19,testingset)
+predicted_test_nb.19
+mmetric(testingset$y,predicted_test_nb.19,metric="CONF")
+mmetric(testingset$y,predicted_test_nb.19,metric=c("ACC","TPR","PRECISION","F1"))
+
+### Remove "nr.employed" - position 20. True Positive class "Yes" Training = 177, Testing = 67
+mCD.nb.20 <- naiveBayes(trainingset[c(-20,-21)],trainingset$y)
+mCD.nb.20
+predicted_train_nb.20 <- predict(mCD.nb.20,trainingset)
+predicted_train_nb.20
+mmetric(trainingset$y,predicted_train_nb.20,metric="CONF")
+mmetric(trainingset$y,predicted_train_nb.20,metric=c("ACC","TPR","PRECISION","F1"))
+predicted_test_nb.20 <- predict(mCD.nb.20,testingset)
+predicted_test_nb.20
+mmetric(testingset$y,predicted_test_nb.20,metric="CONF")
+mmetric(testingset$y,predicted_test_nb.20,metric=c("ACC","TPR","PRECISION","F1"))
+
+### In conclusion, after many trials, I saw that when I removed "pdays" predictor, it could improve the true positive rate of the "Yes" of the target variable y. True Positive for class "Yes" has Training = 219, Testing = 87 which are highest among others.
+
+```
+
+# Create a Named Cross-Validation Function - cv_function
+```{r Create a Named Cross-Validation Function}
+# 4 Create a cv_function
+cv_function <- function(df,target,nFolds,seedVal,classification,metrics_list) # 4A Uses several arguments
+{
+  set.seed(seedVal)
+  Folds = createFolds(df[,target],nFolds)
+  
+  cv_results <- lapply(Folds,function(x)
+  {
+    train <- df[-x,-target]
+    test <- df[x,-target]
+    
+    train_target <- df[-x,target]
+    test_target <- df[x,target]
+    
+    classification_model <- classification(train,train_target)
+    pred <- predict(classification_model,test)
+    
+    return(mmetric(test_target,pred,c("ACC","PRECISION","TPR","F1"))) # 4B Generate and display ACC, PRECISION, TPR, F1
+  })
+  cv_results_matrix <- as.matrix(as.data.frame(cv_results)) # 4C Generate Mean values and Standard Deviations
+  
+  cv_mean <- as.matrix(rowMeans(cv_results_matrix))
+  colnames(cv_mean) <- "Mean"
+  
+  cv_sdeviation <- as.matrix(rowSds(cv_results_matrix))
+  colnames(cv_sdeviation) <-"Sd"
+  
+  cv_all <- cbind(cv_results_matrix,cv_mean,cv_sdeviation)
+  
+  kable(cv_all,digits=2) # 4D Use kable() to show performance metrics by fold, Mean, and Standard Deviations
+}
+```
+
+# Evaluation Performance with cv_function
+```{r Evaluation Performance with cv_function}
+# 5 Evaluate performance for Naive Bayes and C5.0 models by 5-fold and 10-fold
+## Set seed
+set.seed(500)
+
+## Create the folds
+Folds <- createFolds(CD_mdata$y,k=10)
+str(Folds)
+
+## Create loop 
+cv_results <- list()
+k <- 10
+for (i in 1:k)
+{
+  CDTrain <- CD_mdata[-Folds[[i]],]
+  CDTest <- CD_mdata[Folds[[i]],]
+  CD_model <- naiveBayes(y~.,data = CDTrain)
+  CD_pred <- predict(CD_model,CDTest)
+  cv_results[[i]] <- mmetric(CDTest$y,CD_pred,c("ACC","PRECISION","TPR","F1"))
+  print(cv_results[[i]])
+}
+
+## 10-fold Naive Bayes
+df <- CD_mdata
+target <- 21
+seedVal <- 500
+metrics_list <- c("ACC","PRECISION","TPR","F1")
+nFolds <- 10
+assign("classification",naiveBayes)
+cv_function(df,target,nFolds,seedVal,classification,metrics_list)
+
+## 10-fold C5.0
+df <- CD_mdata
+target <- 21
+seedVal <- 500
+metrics_list <- c("ACC","PRECISION","TPR","F1")
+nFolds <- 10
+assign("classification",C5.0)
+cv_function(df,target,nFolds,seedVal,classification,metrics_list)
+
+## 5-fold Naive Bayes
+df <- CD_mdata
+target <- 21
+seedVal <- 500
+metrics_list <- c("ACC","PRECISION","TPR","F1")
+nFolds <- 5
+assign("classification",naiveBayes)
+cv_function(df,target,nFolds,seedVal,classification,metrics_list)
+
+## 5-fold C5.0
+df <- CD_mdata
+target <- 21
+seedVal <- 500
+metrics_list <- c("ACC","PRECISION","TPR","F1")
+nFolds <- 5
+assign("classification",C5.0)
+cv_function(df,target,nFolds,seedVal,classification,metrics_list)
+```
+
+
